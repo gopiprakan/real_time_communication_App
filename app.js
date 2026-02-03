@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStream: null,
         screenStream: null,
         peers: {}, // { socketId: RTCPeerConnection }
+        participants: {}, // { socketId: { userName } }
         socket: null
     };
 
@@ -80,14 +81,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         state.socket.on('user-joined', async ({ userId, userName, socketId }) => {
             showToast(`${userName} joined the room`);
-            // In our logic, the newcomer sends the offer. 
-            // So existing users just wait for the offer.
+            state.participants[socketId] = { userName };
+            updateParticipantList();
         });
 
         state.socket.on('existing-users', async ({ users }) => {
             for (const user of users) {
+                state.participants[user.socketId] = { userName: user.userName };
                 await createPeerConnection(user.socketId, user.userName, true);
             }
+            updateParticipantList();
         });
 
         state.socket.on('signal', async ({ from, signal, type, userName, fromSocketId }) => {
@@ -229,6 +232,9 @@ document.addEventListener('DOMContentLoaded', () => {
             state.peers[socketId].close();
             delete state.peers[socketId];
         }
+        if (state.participants[socketId]) {
+            delete state.participants[socketId];
+        }
         const container = document.getElementById(`container-${socketId}`);
         if (container) container.remove();
         updateParticipantList();
@@ -312,6 +318,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateParticipantList() {
         const list = document.getElementById('participant-list');
+        if (!list) return;
+
         list.innerHTML = `
             <div class="participant-item">
                 <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${state.user.name}" alt="Avatar">
@@ -323,7 +331,23 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         // Add other peers
-        // Note: For a real app, we should get the usernames via the signaling server
+        Object.keys(state.participants).forEach(socketId => {
+            const p = state.participants[socketId];
+            const div = document.createElement('div');
+            div.className = 'participant-item';
+            div.innerHTML = `
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${p.userName}" alt="Avatar">
+                <div class="participant-info">
+                    <span class="name">${p.userName}</span>
+                    <span class="status">Participant</span>
+                </div>
+                <div class="participant-actions">
+                    <i data-lucide="mic" class="status-icon ${state.peers[socketId] && !state.peers[socketId].getReceivers().find(r => r.track && r.track.kind === 'audio' && r.track.enabled) ? 'text-danger' : ''}"></i>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+        lucide.createIcons();
     }
 
     function appendMessage(text, type, sender, time = null) {
@@ -429,122 +453,169 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    sendChat.addEventListener('click', () => {
-        const msg = chatInput.value.trim();
-        if (msg && state.socket) {
-            appendMessage(msg, 'sent', 'You');
-            state.socket.emit('send-message', {
-                roomId: state.roomId,
-                message: msg,
-                userName: state.user.name
-            });
-            chatInput.value = '';
+});
+
+// File Upload Handling
+const fileUpload = document.getElementById('file-upload');
+const filePreviewArea = document.getElementById('file-preview-area');
+if (fileUpload && filePreviewArea) {
+    fileUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            filePreviewArea.style.display = 'block';
+            filePreviewArea.querySelector('.file-name').textContent = file.name;
+            filePreviewArea.querySelector('.progress-bar').style.width = '0%';
+
+            // Simulate upload
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                filePreviewArea.querySelector('.progress-bar').style.width = progress + '%';
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    showToast(`File "${file.name}" ready to share (simulated)`);
+                }
+            }, 100);
         }
     });
 
-    // Whiteboard simple toggle (logic remains similar but UI needs cleaning)
-    toggleWhiteboard.addEventListener('click', () => {
-        state.isWhiteboardOpen = !state.isWhiteboardOpen;
-        document.getElementById('whiteboard-container').classList.toggle('hidden', !state.isWhiteboardOpen);
-    });
-
-    // Sidebar Toggles
-    toggleChat.addEventListener('click', () => {
-        const sidePanel = document.getElementById('side-panel');
-        sidePanel.classList.toggle('hidden');
-        document.querySelector('.meeting-container').classList.toggle('side-panel-open');
-    });
-
-    // Initialize password toggle
-    const togglePassword = document.getElementById('toggle-password');
-    const passwordInput = document.getElementById('password');
-    if (togglePassword) {
-        togglePassword.addEventListener('click', () => {
-            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordInput.setAttribute('type', type);
-            togglePassword.innerHTML = `<i data-lucide="${type === 'password' ? 'eye' : 'eye-off'}"></i>`;
-            lucide.createIcons();
+    const removeBtn = filePreviewArea.querySelector('.remove-file');
+    if (removeBtn) {
+        removeBtn.addEventListener('click', () => {
+            filePreviewArea.style.display = 'none';
+            fileUpload.value = '';
         });
     }
+}
 
-    // Profile Dropdown Toggle
-    const profileTrigger = document.getElementById('profile-trigger');
-    const profileDropdown = document.getElementById('profile-dropdown');
-    if (profileTrigger && profileDropdown) {
-        profileTrigger.addEventListener('click', (e) => {
-            e.stopPropagation();
-            profileDropdown.classList.toggle('active');
-        });
+// Whiteboard simple toggle (logic remains similar but UI needs cleaning)
+toggleWhiteboard.addEventListener('click', () => {
+    state.isWhiteboardOpen = !state.isWhiteboardOpen;
+    document.getElementById('whiteboard-container').classList.toggle('hidden', !state.isWhiteboardOpen);
+});
 
-        document.addEventListener('click', () => {
-            profileDropdown.classList.remove('active');
-        });
+// Sidebar Toggles
+function toggleSidePanel(tabName) {
+    const sidePanel = document.getElementById('side-panel');
+    const isCurrentlyOpen = !sidePanel.classList.contains('hidden');
+    const activeTab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
+
+    if (isCurrentlyOpen && activeTab === tabName) {
+        sidePanel.classList.add('hidden');
+        document.querySelector('.meeting-container').classList.remove('side-panel-open');
+    } else {
+        sidePanel.classList.remove('hidden');
+        document.querySelector('.meeting-container').classList.add('side-panel-open');
+        switchTab(tabName);
     }
+}
 
-    // Whiteboard Logic
-    const canvas = document.getElementById('whiteboard-canvas');
-    if (canvas) {
-        const ctx = canvas.getContext('2d');
-        let drawing = false;
-        let tool = 'pen';
-
-        function resizeCanvas() {
-            const parent = canvas.parentElement;
-            canvas.width = parent.clientWidth;
-            canvas.height = parent.clientHeight - 64; // header height
-        }
-
-        window.addEventListener('resize', resizeCanvas);
-        setTimeout(resizeCanvas, 100);
-
-        canvas.addEventListener('mousedown', (e) => {
-            drawing = true;
-            ctx.beginPath();
-            ctx.moveTo(e.offsetX, e.offsetY);
-        });
-
-        canvas.addEventListener('mousemove', (e) => {
-            if (!drawing) return;
-            ctx.lineWidth = tool === 'eraser' ? 20 : 2;
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : '#6366f1';
-            ctx.lineTo(e.offsetX, e.offsetY);
-            ctx.stroke();
-
-            // Notify others (optional, but would need more socket setup)
-        });
-
-        canvas.addEventListener('mouseup', () => drawing = false);
-        canvas.addEventListener('mouseout', () => drawing = false);
-
-        document.getElementById('pen-tool').addEventListener('click', () => {
-            tool = 'pen';
-            document.getElementById('pen-tool').classList.add('active');
-            document.getElementById('eraser-tool').classList.remove('active');
-        });
-
-        document.getElementById('eraser-tool').addEventListener('click', () => {
-            tool = 'eraser';
-            document.getElementById('eraser-tool').classList.add('active');
-            document.getElementById('pen-tool').classList.remove('active');
-        });
-
-        document.getElementById('clear-btn').addEventListener('click', () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        });
-
-        document.getElementById('hide-whiteboard').addEventListener('click', () => {
-            state.isWhiteboardOpen = false;
-            document.getElementById('whiteboard-container').classList.add('hidden');
-        });
-    }
-
-    // Handle view switching for login/signup
-    authSwitchLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        state.isLoggingIn = !state.isLoggingIn;
-        nameGroup.style.display = state.isLoggingIn ? 'none' : 'block';
-        authSubmit.querySelector('span').textContent = state.isLoggingIn ? 'Log In' : 'Sign Up';
-        document.getElementById('auth-title').textContent = state.isLoggingIn ? 'Welcome Back' : 'Create Account';
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
     });
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.toggle('hidden', !content.id.includes(tabName));
+    });
+}
+
+toggleChat.addEventListener('click', () => toggleSidePanel('chat'));
+toggleParticipantsControl.addEventListener('click', () => toggleSidePanel('participants'));
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
+});
+
+// Initialize password toggle
+const togglePassword = document.getElementById('toggle-password');
+const passwordInput = document.getElementById('password');
+if (togglePassword) {
+    togglePassword.addEventListener('click', () => {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        togglePassword.innerHTML = `<i data-lucide="${type === 'password' ? 'eye' : 'eye-off'}"></i>`;
+        lucide.createIcons();
+    });
+}
+
+// Profile Dropdown Toggle
+const profileTrigger = document.getElementById('profile-trigger');
+const profileDropdown = document.getElementById('profile-dropdown');
+if (profileTrigger && profileDropdown) {
+    profileTrigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        profileDropdown.classList.toggle('active');
+    });
+
+    document.addEventListener('click', () => {
+        profileDropdown.classList.remove('active');
+    });
+}
+
+// Whiteboard Logic
+const canvas = document.getElementById('whiteboard-canvas');
+if (canvas) {
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    let tool = 'pen';
+
+    function resizeCanvas() {
+        const parent = canvas.parentElement;
+        canvas.width = parent.clientWidth;
+        canvas.height = parent.clientHeight - 64; // header height
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    setTimeout(resizeCanvas, 100);
+
+    canvas.addEventListener('mousedown', (e) => {
+        drawing = true;
+        ctx.beginPath();
+        ctx.moveTo(e.offsetX, e.offsetY);
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!drawing) return;
+        ctx.lineWidth = tool === 'eraser' ? 20 : 2;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : '#6366f1';
+        ctx.lineTo(e.offsetX, e.offsetY);
+        ctx.stroke();
+
+        // Notify others (optional, but would need more socket setup)
+    });
+
+    canvas.addEventListener('mouseup', () => drawing = false);
+    canvas.addEventListener('mouseout', () => drawing = false);
+
+    document.getElementById('pen-tool').addEventListener('click', () => {
+        tool = 'pen';
+        document.getElementById('pen-tool').classList.add('active');
+        document.getElementById('eraser-tool').classList.remove('active');
+    });
+
+    document.getElementById('eraser-tool').addEventListener('click', () => {
+        tool = 'eraser';
+        document.getElementById('eraser-tool').classList.add('active');
+        document.getElementById('pen-tool').classList.remove('active');
+    });
+
+    document.getElementById('clear-btn').addEventListener('click', () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+
+    document.getElementById('hide-whiteboard').addEventListener('click', () => {
+        state.isWhiteboardOpen = false;
+        document.getElementById('whiteboard-container').classList.add('hidden');
+    });
+}
+
+// Handle view switching for login/signup
+authSwitchLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    state.isLoggingIn = !state.isLoggingIn;
+    nameGroup.style.display = state.isLoggingIn ? 'none' : 'block';
+    authSubmit.querySelector('span').textContent = state.isLoggingIn ? 'Log In' : 'Sign Up';
+    document.getElementById('auth-title').textContent = state.isLoggingIn ? 'Welcome Back' : 'Create Account';
+});
 });
