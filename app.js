@@ -453,169 +453,185 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-});
-
-// File Upload Handling
-const fileUpload = document.getElementById('file-upload');
-const filePreviewArea = document.getElementById('file-preview-area');
-if (fileUpload && filePreviewArea) {
-    fileUpload.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            filePreviewArea.style.display = 'block';
-            filePreviewArea.querySelector('.file-name').textContent = file.name;
-            filePreviewArea.querySelector('.progress-bar').style.width = '0%';
-
-            // Simulate upload
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += 10;
-                filePreviewArea.querySelector('.progress-bar').style.width = progress + '%';
-                if (progress >= 100) {
-                    clearInterval(interval);
-                    showToast(`File "${file.name}" ready to share (simulated)`);
-                }
-            }, 100);
+    sendChat.addEventListener('click', () => {
+        const msg = chatInput.value.trim();
+        if (msg && state.socket) {
+            appendMessage(msg, 'sent', 'You');
+            state.socket.emit('send-message', {
+                roomId: state.roomId,
+                message: msg,
+                userName: state.user.name
+            });
+            chatInput.value = '';
         }
     });
 
-    const removeBtn = filePreviewArea.querySelector('.remove-file');
-    if (removeBtn) {
-        removeBtn.addEventListener('click', () => {
-            filePreviewArea.style.display = 'none';
-            fileUpload.value = '';
+    // File Upload Handling
+    const fileUpload = document.getElementById('file-upload');
+    const filePreviewArea = document.getElementById('file-preview-area');
+    if (fileUpload && filePreviewArea) {
+        fileUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                filePreviewArea.style.display = 'block';
+                filePreviewArea.querySelector('.file-name').textContent = file.name;
+                filePreviewArea.querySelector('.progress-bar').style.width = '0%';
+
+                // Simulate upload
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += 10;
+                    filePreviewArea.querySelector('.progress-bar').style.width = progress + '%';
+                    if (progress >= 100) {
+                        clearInterval(interval);
+                        showToast(`File "${file.name}" ready to share (simulated)`);
+                    }
+                }, 100);
+            }
+        });
+
+        const removeBtn = filePreviewArea.querySelector('.remove-file');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => {
+                filePreviewArea.style.display = 'none';
+                fileUpload.value = '';
+            });
+        }
+    }
+
+    // Whiteboard simple toggle
+    toggleWhiteboard.addEventListener('click', () => {
+        state.isWhiteboardOpen = !state.isWhiteboardOpen;
+        document.getElementById('whiteboard-container').classList.toggle('hidden', !state.isWhiteboardOpen);
+    });
+
+    // Sidebar Toggles
+    function toggleSidePanel(tabName) {
+        const sidePanel = document.getElementById('side-panel');
+        const isCurrentlyOpen = !sidePanel.classList.contains('hidden');
+        const activeTab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
+
+        if (isCurrentlyOpen && activeTab === tabName) {
+            sidePanel.classList.add('hidden');
+            document.querySelector('.meeting-container').classList.remove('side-panel-open');
+        } else {
+            sidePanel.classList.remove('hidden');
+            document.querySelector('.meeting-container').classList.add('side-panel-open');
+            switchTab(tabName);
+        }
+    }
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+        });
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.toggle('hidden', !content.id.includes(tabName));
         });
     }
-}
 
-// Whiteboard simple toggle (logic remains similar but UI needs cleaning)
-toggleWhiteboard.addEventListener('click', () => {
-    state.isWhiteboardOpen = !state.isWhiteboardOpen;
-    document.getElementById('whiteboard-container').classList.toggle('hidden', !state.isWhiteboardOpen);
-});
+    if (toggleChat) toggleChat.addEventListener('click', () => toggleSidePanel('chat'));
+    if (toggleParticipantsControl) toggleParticipantsControl.addEventListener('click', () => toggleSidePanel('participants'));
 
-// Sidebar Toggles
-function toggleSidePanel(tabName) {
-    const sidePanel = document.getElementById('side-panel');
-    const isCurrentlyOpen = !sidePanel.classList.contains('hidden');
-    const activeTab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
-
-    if (isCurrentlyOpen && activeTab === tabName) {
-        sidePanel.classList.add('hidden');
-        document.querySelector('.meeting-container').classList.remove('side-panel-open');
-    } else {
-        sidePanel.classList.remove('hidden');
-        document.querySelector('.meeting-container').classList.add('side-panel-open');
-        switchTab(tabName);
-    }
-}
-
-function switchTab(tabName) {
     document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
-    });
-    document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.toggle('hidden', !content.id.includes(tabName));
-    });
-}
-
-toggleChat.addEventListener('click', () => toggleSidePanel('chat'));
-toggleParticipantsControl.addEventListener('click', () => toggleSidePanel('participants'));
-
-document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
-});
-
-// Initialize password toggle
-const togglePassword = document.getElementById('toggle-password');
-const passwordInput = document.getElementById('password');
-if (togglePassword) {
-    togglePassword.addEventListener('click', () => {
-        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-        passwordInput.setAttribute('type', type);
-        togglePassword.innerHTML = `<i data-lucide="${type === 'password' ? 'eye' : 'eye-off'}"></i>`;
-        lucide.createIcons();
-    });
-}
-
-// Profile Dropdown Toggle
-const profileTrigger = document.getElementById('profile-trigger');
-const profileDropdown = document.getElementById('profile-dropdown');
-if (profileTrigger && profileDropdown) {
-    profileTrigger.addEventListener('click', (e) => {
-        e.stopPropagation();
-        profileDropdown.classList.toggle('active');
+        btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
     });
 
-    document.addEventListener('click', () => {
-        profileDropdown.classList.remove('active');
-    });
-}
-
-// Whiteboard Logic
-const canvas = document.getElementById('whiteboard-canvas');
-if (canvas) {
-    const ctx = canvas.getContext('2d');
-    let drawing = false;
-    let tool = 'pen';
-
-    function resizeCanvas() {
-        const parent = canvas.parentElement;
-        canvas.width = parent.clientWidth;
-        canvas.height = parent.clientHeight - 64; // header height
+    // Initialize password toggle
+    const togglePassword = document.getElementById('toggle-password');
+    const passwordInput = document.getElementById('password');
+    if (togglePassword) {
+        togglePassword.addEventListener('click', () => {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            togglePassword.innerHTML = `<i data-lucide="${type === 'password' ? 'eye' : 'eye-off'}"></i>`;
+            lucide.createIcons();
+        });
     }
 
-    window.addEventListener('resize', resizeCanvas);
-    setTimeout(resizeCanvas, 100);
+    // Profile Dropdown Toggle
+    const profileTrigger = document.getElementById('profile-trigger');
+    const profileDropdown = document.getElementById('profile-dropdown');
+    if (profileTrigger && profileDropdown) {
+        profileTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            profileDropdown.classList.toggle('active');
+        });
 
-    canvas.addEventListener('mousedown', (e) => {
-        drawing = true;
-        ctx.beginPath();
-        ctx.moveTo(e.offsetX, e.offsetY);
+        document.addEventListener('click', () => {
+            profileDropdown.classList.remove('active');
+        });
+    }
+
+    // Whiteboard Logic
+    const canvas = document.getElementById('whiteboard-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        let drawing = false;
+        let tool = 'pen';
+
+        function resizeCanvas() {
+            const parent = canvas.parentElement;
+            if (parent) {
+                canvas.width = parent.clientWidth;
+                canvas.height = parent.clientHeight - 64; // header height
+            }
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        setTimeout(resizeCanvas, 100);
+
+        canvas.addEventListener('mousedown', (e) => {
+            drawing = true;
+            ctx.beginPath();
+            ctx.moveTo(e.offsetX, e.offsetY);
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!drawing) return;
+            ctx.lineWidth = tool === 'eraser' ? 20 : 2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : '#6366f1';
+            ctx.lineTo(e.offsetX, e.offsetY);
+            ctx.stroke();
+        });
+
+        canvas.addEventListener('mouseup', () => drawing = false);
+        canvas.addEventListener('mouseout', () => drawing = false);
+
+        const penTool = document.getElementById('pen-tool');
+        const eraserTool = document.getElementById('eraser-tool');
+        const clearBtn = document.getElementById('clear-btn');
+        const hideWb = document.getElementById('hide-whiteboard');
+
+        if (penTool) penTool.addEventListener('click', () => {
+            tool = 'pen';
+            penTool.classList.add('active');
+            eraserTool.classList.remove('active');
+        });
+
+        if (eraserTool) eraserTool.addEventListener('click', () => {
+            tool = 'eraser';
+            eraserTool.classList.add('active');
+            penTool.classList.remove('active');
+        });
+
+        if (clearBtn) clearBtn.addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+
+        if (hideWb) hideWb.addEventListener('click', () => {
+            state.isWhiteboardOpen = false;
+            document.getElementById('whiteboard-container').classList.add('hidden');
+        });
+    }
+
+    // Handle view switching for login/signup
+    authSwitchLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        state.isLoggingIn = !state.isLoggingIn;
+        nameGroup.style.display = state.isLoggingIn ? 'none' : 'block';
+        authSubmit.querySelector('span').textContent = state.isLoggingIn ? 'Log In' : 'Sign Up';
+        document.getElementById('auth-title').textContent = state.isLoggingIn ? 'Welcome Back' : 'Create Account';
     });
-
-    canvas.addEventListener('mousemove', (e) => {
-        if (!drawing) return;
-        ctx.lineWidth = tool === 'eraser' ? 20 : 2;
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : '#6366f1';
-        ctx.lineTo(e.offsetX, e.offsetY);
-        ctx.stroke();
-
-        // Notify others (optional, but would need more socket setup)
-    });
-
-    canvas.addEventListener('mouseup', () => drawing = false);
-    canvas.addEventListener('mouseout', () => drawing = false);
-
-    document.getElementById('pen-tool').addEventListener('click', () => {
-        tool = 'pen';
-        document.getElementById('pen-tool').classList.add('active');
-        document.getElementById('eraser-tool').classList.remove('active');
-    });
-
-    document.getElementById('eraser-tool').addEventListener('click', () => {
-        tool = 'eraser';
-        document.getElementById('eraser-tool').classList.add('active');
-        document.getElementById('pen-tool').classList.remove('active');
-    });
-
-    document.getElementById('clear-btn').addEventListener('click', () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    });
-
-    document.getElementById('hide-whiteboard').addEventListener('click', () => {
-        state.isWhiteboardOpen = false;
-        document.getElementById('whiteboard-container').classList.add('hidden');
-    });
-}
-
-// Handle view switching for login/signup
-authSwitchLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    state.isLoggingIn = !state.isLoggingIn;
-    nameGroup.style.display = state.isLoggingIn ? 'none' : 'block';
-    authSubmit.querySelector('span').textContent = state.isLoggingIn ? 'Log In' : 'Sign Up';
-    document.getElementById('auth-title').textContent = state.isLoggingIn ? 'Welcome Back' : 'Create Account';
-});
 });
