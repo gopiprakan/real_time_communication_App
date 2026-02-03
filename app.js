@@ -467,6 +467,78 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Profile Dropdown Toggle
+    const profileTrigger = document.getElementById('profile-trigger');
+    const profileDropdown = document.getElementById('profile-dropdown');
+    if (profileTrigger && profileDropdown) {
+        profileTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            profileDropdown.classList.toggle('active');
+        });
+
+        document.addEventListener('click', () => {
+            profileDropdown.classList.remove('active');
+        });
+    }
+
+    // Whiteboard Logic
+    const canvas = document.getElementById('whiteboard-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        let drawing = false;
+        let tool = 'pen';
+
+        function resizeCanvas() {
+            const parent = canvas.parentElement;
+            canvas.width = parent.clientWidth;
+            canvas.height = parent.clientHeight - 64; // header height
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        setTimeout(resizeCanvas, 100);
+
+        canvas.addEventListener('mousedown', (e) => {
+            drawing = true;
+            ctx.beginPath();
+            ctx.moveTo(e.offsetX, e.offsetY);
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!drawing) return;
+            ctx.lineWidth = tool === 'eraser' ? 20 : 2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : '#6366f1';
+            ctx.lineTo(e.offsetX, e.offsetY);
+            ctx.stroke();
+
+            // Notify others (optional, but would need more socket setup)
+        });
+
+        canvas.addEventListener('mouseup', () => drawing = false);
+        canvas.addEventListener('mouseout', () => drawing = false);
+
+        document.getElementById('pen-tool').addEventListener('click', () => {
+            tool = 'pen';
+            document.getElementById('pen-tool').classList.add('active');
+            document.getElementById('eraser-tool').classList.remove('active');
+        });
+
+        document.getElementById('eraser-tool').addEventListener('click', () => {
+            tool = 'eraser';
+            document.getElementById('eraser-tool').classList.add('active');
+            document.getElementById('pen-tool').classList.remove('active');
+        });
+
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+
+        document.getElementById('hide-whiteboard').addEventListener('click', () => {
+            state.isWhiteboardOpen = false;
+            document.getElementById('whiteboard-container').classList.add('hidden');
+        });
+    }
+
     // Handle view switching for login/signup
     authSwitchLink.addEventListener('click', (e) => {
         e.preventDefault();
