@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect - Premium Real-Time Communication</title>
+    <meta name="description"
+        content="Professional, clean, and intuitive real-time communication platform for modern teams.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <div id="app">
+        <!-- Auth View -->
+        <section id="auth-view" class="view">
+            <div class="auth-container">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <div class="logo">
+                            <i data-lucide="video" class="logo-icon"></i>
+                            <span>Connect</span>
+                        </div>
+                        <h1 id="auth-title">Welcome Back</h1>
+                        <p id="auth-subtitle">Log in to your account to continue</p>
+                    </div>
+
+                    <form id="auth-form">
+                        <div class="form-group" id="name-group" style="display: none;">
+                            <label for="full-name">Full Name</label>
+                            <div class="input-wrapper">
+                                <i data-lucide="user"></i>
+                                <input type="text" id="full-name" placeholder="John Doe">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email">Email Address</label>
+                            <div class="input-wrapper">
+                                <i data-lucide="mail"></i>
+                                <input type="email" id="email" placeholder="name@company.com" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <div class="input-wrapper">
+                                <i data-lucide="lock"></i>
+                                <input type="password" id="password" placeholder="••••••••" required>
+                                <button type="button" class="password-toggle" id="toggle-password">
+                                    <i data-lucide="eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="auth-error" class="error-message" style="display: none;"></div>
+
+                        <button type="submit" class="btn btn-primary btn-block" id="auth-submit">
+                            <span>Log In</span>
+                            <i data-lucide="arrow-right"></i>
+                        </button>
+                    </form>
+
+                    <div class="auth-footer">
+                        <p id="auth-switch-text">Don't have an account? <a href="#" id="auth-switch-link">Sign Up</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard View -->
+        <section id="dashboard-view" class="view hidden">
+            <header class="app-header">
+                <div class="logo">
+                    <i data-lucide="video" class="logo-icon"></i>
+                    <span>Connect</span>
+                </div>
+                <div class="header-actions">
+                    <div class="profile-menu">
+                        <button class="profile-trigger" id="profile-trigger">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=John" alt="Profile"
+                                class="avatar">
+                            <span class="username">John Doe</span>
+                            <i data-lucide="chevron-down"></i>
+                        </button>
+                        <div class="dropdown-menu" id="profile-dropdown">
+                            <a href="#" class="dropdown-item">
+                                <i data-lucide="settings"></i> Settings
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item text-danger" id="logout-btn">
+                                <i data-lucide="log-out"></i> Log Out
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <main class="dashboard-content">
+                <div class="welcome-section">
+                    <h1>Good morning, John</h1>
+                    <p>Start a new meeting or join one in progress.</p>
+                </div>
+
+                <div class="actions-grid">
+                    <div class="action-card primary" id="start-meeting-btn">
+                        <div class="action-icon">
+                            <i data-lucide="video"></i>
+                        </div>
+                        <h3>New Meeting</h3>
+                        <p>Set up a new video call instantly</p>
+                        <button class="btn btn-white">Start Now</button>
+                    </div>
+
+                    <div class="action-card secondary">
+                        <div class="action-icon">
+                            <i data-lucide="plus-square"></i>
+                        </div>
+                        <h3>Join Meeting</h3>
+                        <p>Enter a code or link to join</p>
+                        <div class="join-input-group">
+                            <input type="text" id="meeting-id" placeholder="Enter meeting ID">
+                            <button class="btn btn-primary" id="join-btn">Join</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recent-meetings">
+                    <div class="section-header">
+                        <h2>Recent Meetings</h2>
+                        <a href="#">View All</a>
+                    </div>
+                    <div class="meetings-list">
+                        <div class="meeting-item">
+                            <div class="meeting-info">
+                                <div class="meeting-icon">
+                                    <i data-lucide="calendar"></i>
+                                </div>
+                                <div class="meeting-details">
+                                    <h4>Weekly Sync - Marketing</h4>
+                                    <span>Today, 10:00 AM • ID: mkt-123-sync</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-ghost">Join Again</button>
+                        </div>
+                        <div class="meeting-item">
+                            <div class="meeting-info">
+                                <div class="meeting-icon">
+                                    <i data-lucide="calendar"></i>
+                                </div>
+                                <div class="meeting-details">
+                                    <h4>Product Design Review</h4>
+                                    <span>Yesterday, 2:30 PM • ID: prd-rev-789</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-ghost">Revisit</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </section>
+
+        <!-- Meeting Room View -->
+        <section id="meeting-view" class="view hidden">
+            <div class="meeting-container">
+                <div class="main-content">
+                    <div class="video-grid" id="video-grid">
+                        <div class="video-container local" id="local-video-container">
+                            <video id="local-video" autoplay playsinline muted></video>
+                            <div class="video-placeholder" id="local-placeholder">
+                                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=John" alt="Me"
+                                    id="local-avatar">
+                                <p>You</p>
+                            </div>
+                            <div class="video-actions">
+                                <span id="local-name-display">You</span>
+                                <i data-lucide="mic-off" class="status-icon mic-muted" id="local-mic-status"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Whiteboard Container -->
+                    <div id="whiteboard-container" class="whiteboard-layer hidden">
+                        <div class="whiteboard-header">
+                            <h3>Whiteboard</h3>
+                            <div class="whiteboard-tools">
+                                <button class="tool-btn active" id="pen-tool" title="Pen">
+                                    <i data-lucide="pencil"></i>
+                                </button>
+                                <button class="tool-btn" id="eraser-tool" title="Eraser">
+                                    <i data-lucide="eraser"></i>
+                                </button>
+                                <div class="tool-divider"></div>
+                                <button class="tool-btn" id="undo-btn" title="Undo">
+                                    <i data-lucide="undo"></i>
+                                </button>
+                                <button class="tool-btn" id="clear-btn" title="Clear All">
+                                    <i data-lucide="trash-2"></i>
+                                </button>
+                            </div>
+                            <button class="close-btn" id="hide-whiteboard">
+                                <i data-lucide="x"></i>
+                            </button>
+                        </div>
+                        <canvas id="whiteboard-canvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Side Panels -->
+                <aside class="side-panel hidden" id="side-panel">
+                    <div class="panel-tabs">
+                        <button class="tab-btn active" data-tab="chat">Chat</button>
+                        <button class="tab-btn" data-tab="participants">Participants</button>
+                    </div>
+
+                    <div class="panel-content">
+                        <!-- Chat Section -->
+                        <div id="chat-section" class="tab-content">
+                            <div class="chat-messages" id="chat-messages">
+                                <!-- Messages will appear here -->
+                            </div>
+
+                            <div class="file-preview-area" id="file-preview-area" style="display: none;">
+                                <div class="file-item">
+                                    <i data-lucide="file-text"></i>
+                                    <span class="file-name">Project_Requirements.pdf</span>
+                                    <div class="upload-progress">
+                                        <div class="progress-bar" style="width: 65%;"></div>
+                                    </div>
+                                    <button class="remove-file"><i data-lucide="x"></i></button>
+                                </div>
+                            </div>
+
+                            <div class="chat-input-wrapper">
+                                <div class="chat-actions">
+                                    <label for="file-upload" class="icon-btn" title="Upload File">
+                                        <i data-lucide="paperclip"></i>
+                                        <input type="file" id="file-upload" hidden>
+                                    </label>
+                                </div>
+                                <input type="text" id="chat-input" placeholder="Type a message...">
+                                <button id="send-chat" class="send-btn">
+                                    <i data-lucide="send"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Participants Section -->
+                        <div id="participants-section" class="tab-content hidden">
+                            <div class="participant-list" id="participant-list">
+                                <!-- Participants will appear here -->
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Meeting Controls -->
+                <footer class="meeting-controls">
+                    <div class="meeting-info-brief">
+                        <span class="meeting-time">Live Room</span>
+                        <span class="divider">|</span>
+                        <span class="meeting-id-display" id="meeting-id-display">ID</span>
+                        <button id="copy-id-btn" class="icon-btn" title="Copy ID">
+                            <i data-lucide="copy"></i>
+                        </button>
+                    </div>
+
+                    <div class="main-controls">
+                        <button class="control-btn" id="toggle-mic" title="Mute/Unmute">
+                            <i data-lucide="mic"></i>
+                        </button>
+                        <button class="control-btn" id="toggle-video" title="Start/Stop Video">
+                            <i data-lucide="video"></i>
+                        </button>
+                        <button class="control-btn" id="share-screen" title="Share Screen">
+                            <i data-lucide="monitor"></i>
+                        </button>
+                        <button class="control-btn" id="toggle-whiteboard" title="Whiteboard">
+                            <i data-lucide="layout"></i>
+                        </button>
+                        <button class="control-btn danger" id="leave-meeting" title="Leave Meeting">
+                            <i data-lucide="phone-off"></i>
+                        </button>
+                    </div>
+
+                    <div class="secondary-controls">
+                        <button class="control-btn" id="toggle-chat" title="Chat">
+                            <i data-lucide="message-square"></i>
+                            <span class="badge"></span>
+                        </button>
+                        <button class="control-btn" id="toggle-participants" title="Participants">
+                            <i data-lucide="users"></i>
+                        </button>
+                    </div>
+                </footer>
+            </div>
+        </section>
+    </div>
+
+    <!-- Feedback Toasts -->
+    <div id="toast-container"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
