@@ -26,6 +26,106 @@ document.addEventListener('DOMContentLoaded', () => {
         socket: null
     };
 
+    // --- UI/Avatar Helpers ---
+    function getAvatarURL(seed) {
+        // Assign a style based on the seed string to keep it consistent for that user
+        const styles = ['avataaars', 'bottts', 'adventurer', 'lorelei', 'personas'];
+        let hash = 0;
+        for (let i = 0; i < seed.length; i++) {
+            hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const styleIndex = Math.abs(hash) % styles.length;
+        const style = styles[styleIndex];
+
+        return `https://api.dicebear.com/7.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
+    }
+
+    function getInitials(name) {
+        if (!name) return '??';
+        return name.split(' ')
+            .map(n => n[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2);
+    }
+
+    function saveMeetingToHistory(roomId) {
+        if (!roomId) return;
+
+        try {
+            const history = JSON.parse(localStorage.getItem('meeting_history') || '[]');
+            const now = new Date();
+
+            // Avoid duplicate entries for the same room in the same session, 
+            // or just update the timestamp if it's the same room
+            const existingIndex = history.findIndex(m => m.id === roomId);
+
+            const newEntry = {
+                id: roomId,
+                title: `Meeting Session`,
+                date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: now.getTime()
+            };
+
+            if (existingIndex !== -1) {
+                // Update existing
+                history.splice(existingIndex, 1);
+            }
+
+            history.unshift(newEntry);
+
+            // Limit to 10 items
+            const limitedHistory = history.slice(0, 10);
+            localStorage.setItem('meeting_history', JSON.stringify(limitedHistory));
+        } catch (e) {
+            console.error('Error saving history:', e);
+        }
+    }
+
+    function displayMeetingHistory() {
+        const list = document.querySelector('.meetings-list');
+        if (!list) return;
+
+        try {
+            const history = JSON.parse(localStorage.getItem('meeting_history') || '[]');
+
+            if (history.length === 0) {
+                list.innerHTML = `
+                    <div class="meeting-item no-history">
+                        <p>No recent meetings yet.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = history.map(meeting => `
+                <div class="meeting-item">
+                    <div class="meeting-info">
+                        <div class="meeting-icon">
+                            <i data-lucide="calendar"></i>
+                        </div>
+                        <div class="meeting-details">
+                            <h4>${meeting.title}</h4>
+                            <span>${meeting.date}, ${meeting.time} • ID: ${meeting.id}</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-ghost" onclick="window.rejoinMeeting('${meeting.id}')">Join Again</button>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+        } catch (e) {
+            console.error('Error displaying history:', e);
+        }
+    }
+
+    // Expose rejoin function to window for the buttons
+    window.rejoinMeeting = (roomId) => {
+        meetingIdInput.value = roomId;
+        joinBtn.click();
+    };
+
     // --- Configuration ---
     const iceServers = {
         iceServers: [
@@ -210,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = `
             <video id="video-${socketId}" autoplay playsinline></video>
             <div class="video-placeholder">
-                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}" alt="${userName}">
+                <img src="${getAvatarURL(userName)}" alt="${userName}">
                 <p>${userName}</p>
             </div>
             <div class="video-actions">
@@ -293,19 +393,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- UI Helpers ---
     function updateControlUI() {
         // Mic
-        toggleMic.innerHTML = `<i data-lucide="${state.isMuted ? 'mic-off' : 'mic'}"></i>`;
+        const micIcon = state.isMuted ? 'mic-off' : 'mic';
+        toggleMic.innerHTML = `<i data-lucide="${micIcon}"></i>`;
         toggleMic.className = `control-btn ${state.isMuted ? 'danger' : ''}`;
-        document.getElementById('local-mic-status').setAttribute('data-lucide', state.isMuted ? 'mic-off' : 'mic');
-        document.getElementById('local-mic-status').className = `status-icon ${state.isMuted ? 'mic-muted text-danger' : ''}`;
+
+        const localMicStatus = document.getElementById('local-mic-status');
+        if (localMicStatus) {
+            localMicStatus.outerHTML = `<i data-lucide="${micIcon}" class="status-icon ${state.isMuted ? 'mic-muted text-danger' : ''}" id="local-mic-status"></i>`;
+        }
 
         // Video
-        toggleVideo.innerHTML = `<i data-lucide="${state.isVideoOff ? 'video-off' : 'video'}"></i>`;
+        const videoIcon = state.isVideoOff ? 'video-off' : 'video';
+        toggleVideo.innerHTML = `<i data-lucide="${videoIcon}"></i>`;
         toggleVideo.className = `control-btn ${state.isVideoOff ? 'danger' : ''}`;
         localVideoContainer.classList.toggle('no-video', state.isVideoOff);
 
         // Screen Share
+        const screenIcon = state.isSharingScreen ? 'monitor-off' : 'monitor';
+        shareScreen.innerHTML = `<i data-lucide="${screenIcon}"></i>`;
         shareScreen.classList.toggle('active', state.isSharingScreen);
-        shareScreen.querySelector('i').setAttribute('data-lucide', state.isSharingScreen ? 'monitor-off' : 'monitor');
 
         lucide.createIcons();
     }
@@ -314,6 +420,10 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.keys(views).forEach(key => views[key].classList.add('hidden'));
         views[viewName].classList.remove('hidden');
         state.currentView = viewName;
+
+        if (viewName === 'dashboard') {
+            displayMeetingHistory();
+        }
     }
 
     function updateParticipantList() {
@@ -322,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         list.innerHTML = `
             <div class="participant-item">
-                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${state.user.name}" alt="Avatar">
+                <img src="${getAvatarURL(state.user.name)}" alt="Avatar">
                 <div class="participant-info">
                     <span class="name">${state.user.name} (You)</span>
                     <span class="status">Host</span>
@@ -336,7 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const div = document.createElement('div');
             div.className = 'participant-item';
             div.innerHTML = `
-                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${p.userName}" alt="Avatar">
+                <img src="${getAvatarURL(p.userName)}" alt="Avatar">
                 <div class="participant-info">
                     <span class="name">${p.userName}</span>
                     <span class="status">Participant</span>
@@ -379,17 +489,103 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Event Listeners ---
-    authForm.addEventListener('submit', (e) => {
+
+    // Auth Form Handling with Firebase
+    authForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = emailField.value;
-        const name = state.isLoggingIn ? email.split('@')[0] : loginNameField.value;
+        const password = document.getElementById('password').value;
+        const name = loginNameField.value;
 
-        state.user = { name, email };
-        usernameDisplay.textContent = name;
-        switchView('dashboard');
-        initSocket();
-        showToast(`Welcome, ${name}!`);
+        const authSubmitBtn = document.getElementById('auth-submit');
+        authSubmitBtn.disabled = true;
+        authSubmitBtn.querySelector('span').textContent = state.isLoggingIn ? 'Logging in...' : 'Signing up...';
+
+        try {
+            const { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } = window.firebaseAuth;
+            const { db, doc, setDoc, serverTimestamp } = window.firebaseDb;
+
+            if (state.isLoggingIn) {
+                // Sign In
+                await signInWithEmailAndPassword(auth, email, password);
+                showToast('Signed in successfully');
+            } else {
+                // Sign Up
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // Update Firebase Auth Profile
+                await updateProfile(user, { displayName: name });
+
+                // Store User Data in Firestore
+                await setDoc(doc(db, "users", user.uid), {
+                    uid: user.uid,
+                    displayName: name,
+                    email: email,
+                    createdAt: serverTimestamp(),
+                    avatarStyle: ['avataaars', 'bottts', 'adventurer', 'lorelei', 'personas'][Math.floor(Math.random() * 5)]
+                });
+
+                showToast('Account created and details stored');
+            }
+        } catch (error) {
+            console.error('Auth error:', error);
+            const errorDiv = document.getElementById('auth-error');
+            errorDiv.textContent = error.message;
+            errorDiv.style.display = 'block';
+            authSubmitBtn.disabled = false;
+            authSubmitBtn.querySelector('span').textContent = state.isLoggingIn ? 'Log In' : 'Sign Up';
+        }
     });
+
+    // Handle Authentication State Changes
+    if (window.firebaseAuth) {
+        const { auth, onAuthStateChanged } = window.firebaseAuth;
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is signed in
+                const name = user.displayName || user.email.split('@')[0];
+                state.user = { name, email: user.email, uid: user.uid };
+
+                // Update UI for logged-in user
+                usernameDisplay.textContent = name;
+                const profileAvatar = document.querySelector('.profile-trigger .avatar');
+                if (profileAvatar) profileAvatar.src = getAvatarURL(name);
+
+                const welcomeTitle = document.querySelector('.welcome-section h1');
+                if (welcomeTitle) welcomeTitle.textContent = `Good morning, ${name.split(' ')[0]}`;
+
+                const localAvatar = document.getElementById('local-avatar');
+                if (localAvatar) localAvatar.src = getAvatarURL(name);
+
+                switchView('dashboard');
+                if (!state.socket) initSocket();
+            } else {
+                // User is signed out
+                state.user = null;
+                switchView('auth');
+                if (state.socket) {
+                    state.socket.disconnect();
+                    state.socket = null;
+                }
+            }
+        });
+    }
+
+    // Logout Handling
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            try {
+                const { auth, signOut } = window.firebaseAuth;
+                await signOut(auth);
+                showToast('Signed out');
+            } catch (error) {
+                showToast('Error signing out', 'error');
+            }
+        });
+    }
 
     startMeetingBtn.addEventListener('click', async () => {
         state.roomId = 'room-' + Math.random().toString(36).substr(2, 9);
@@ -448,8 +644,50 @@ document.addEventListener('DOMContentLoaded', () => {
     shareScreen.addEventListener('click', toggleScreenShare);
 
     leaveMeeting.addEventListener('click', () => {
-        if (confirm('Leave meeting?')) {
-            location.reload(); // Simplest way to clean up all WebRTC and socket state
+        if (confirm('Are you sure you want to end this meeting?')) {
+            // Save to history before leaving
+            if (state.roomId) {
+                saveMeetingToHistory(state.roomId);
+            }
+
+            // Cleanup WebRTC
+            if (state.localStream) {
+                state.localStream.getTracks().forEach(track => track.stop());
+                state.localStream = null;
+            }
+            if (state.screenStream) {
+                state.screenStream.getTracks().forEach(track => track.stop());
+                state.screenStream = null;
+            }
+
+            // Close all peer connections
+            Object.keys(state.peers).forEach(id => {
+                if (state.peers[id]) {
+                    state.peers[id].close();
+                }
+            });
+            state.peers = {};
+            state.participants = {};
+
+            // Remove remote videos from UI
+            const remoteContainers = videoGrid.querySelectorAll('.video-container:not(.local)');
+            remoteContainers.forEach(container => container.remove());
+
+            // Notify server
+            if (state.socket) {
+                state.socket.emit('leave-room');
+            }
+
+            // Reset meeting state
+            state.roomId = null;
+            state.isSharingScreen = false;
+            state.isWhiteboardOpen = false;
+            document.getElementById('whiteboard-container').classList.add('hidden');
+
+            // Switch back to dashboard
+            switchView('dashboard');
+
+            showToast('Meeting ended and saved to history');
         }
     });
 
@@ -502,7 +740,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Whiteboard simple toggle
     toggleWhiteboard.addEventListener('click', () => {
         state.isWhiteboardOpen = !state.isWhiteboardOpen;
-        document.getElementById('whiteboard-container').classList.toggle('hidden', !state.isWhiteboardOpen);
+        const wbContainer = document.getElementById('whiteboard-container');
+        wbContainer.classList.toggle('hidden', !state.isWhiteboardOpen);
+        if (state.isWhiteboardOpen) {
+            setTimeout(window.resizeWhiteboard, 100);
+        }
     });
 
     // Sidebar Toggles
@@ -572,11 +814,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function resizeCanvas() {
             const parent = canvas.parentElement;
-            if (parent) {
+            if (parent && !parent.classList.contains('hidden')) {
                 canvas.width = parent.clientWidth;
                 canvas.height = parent.clientHeight - 64; // header height
             }
         }
+        window.resizeWhiteboard = resizeCanvas;
 
         window.addEventListener('resize', resizeCanvas);
         setTimeout(resizeCanvas, 100);
@@ -598,6 +841,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         canvas.addEventListener('mouseup', () => drawing = false);
         canvas.addEventListener('mouseout', () => drawing = false);
+
+        // Touch Support
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            drawing = true;
+            ctx.beginPath();
+            ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!drawing) return;
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            ctx.lineWidth = tool === 'eraser' ? 20 : 2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : '#6366f1';
+            ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+            ctx.stroke();
+        });
+
+        canvas.addEventListener('touchend', () => drawing = false);
 
         const penTool = document.getElementById('pen-tool');
         const eraserTool = document.getElementById('eraser-tool');

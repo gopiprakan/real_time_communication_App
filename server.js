@@ -34,6 +34,7 @@ io.on('connection', (socket) => {
         }
 
         socket.userName = userName; // Store on socket for later
+        socket.roomId = roomId; // Track current room
         socket.join(roomId);
         console.log(`User ${userId} (${userName}) joined room: ${roomId}`);
 
@@ -42,11 +43,23 @@ io.on('connection', (socket) => {
 
         // Notify others in the room
         socket.to(roomId).emit('user-joined', { userId, userName, socketId: socket.id });
+    });
 
-        socket.on('disconnect', () => {
-            console.log('User disconnected:', socket.id);
-            socket.to(roomId).emit('user-left', { userId, socketId: socket.id });
-        });
+    socket.on('leave-room', () => {
+        if (socket.roomId) {
+            const roomId = socket.roomId;
+            socket.to(roomId).emit('user-left', { userId: socket.id, socketId: socket.id });
+            socket.leave(roomId);
+            console.log(`User ${socket.id} left room: ${roomId}`);
+            socket.roomId = null;
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('User disconnected:', socket.id);
+        if (socket.roomId) {
+            socket.to(socket.roomId).emit('user-left', { userId: socket.id, socketId: socket.id });
+        }
     });
 
     // WebRTC Signaling

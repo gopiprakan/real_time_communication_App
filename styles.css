@@ -446,6 +446,12 @@ input {
     border-bottom: none;
 }
 
+.no-history {
+    padding: 40px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
 .meeting-info {
     display: flex;
     align-items: center;
