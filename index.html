@@ -306,6 +306,45 @@
     <!-- Feedback Toasts -->
     <div id="toast-container"></div>
 
+    <!-- Firebase SDK (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <!-- Firebase Configuration and Initializer -->
+    <script>
+        // Use a generic config - the user should replace this with their own later
+        // but this will allow the app to load without immediate "undefined" errors
+        const firebaseConfig = {
+            apiKey: "AIzaSyAs-DEMO-ONLY",
+            authDomain: "connect-demo.firebaseapp.com",
+            projectId: "connect-demo",
+            storageBucket: "connect-demo.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef123456"
+        };
+
+        // Initialize Firebase
+        const firebaseApp = firebase.initializeApp(firebaseConfig);
+
+        // Attach to window objects as expected by app.js
+        window.firebaseAuth = {
+            auth: firebase.auth(),
+            onAuthStateChanged: (auth, callback) => firebase.auth().onAuthStateChanged(callback),
+            signInWithEmailAndPassword: (auth, email, password) => firebase.auth().signInWithEmailAndPassword(email, password),
+            createUserWithEmailAndPassword: (auth, email, password) => firebase.auth().createUserWithEmailAndPassword(email, password),
+            updateProfile: (user, data) => user.updateProfile(data),
+            signOut: (auth) => firebase.auth().signOut()
+        };
+
+        window.firebaseDb = {
+            db: firebase.firestore(),
+            doc: (db, collection, id) => db.collection(collection).doc(id),
+            setDoc: (docRef, data) => docRef.set(data),
+            serverTimestamp: () => firebase.firestore.FieldValue.serverTimestamp()
+        };
+    </script>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="app.js"></script>
 </body>
