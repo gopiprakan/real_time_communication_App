@@ -9,10 +9,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- State Management ---
     const state = {
-        user: null,
+        user: null, // { uid, email, firstName, lastName, photoURL, avatarStyle }
         currentView: 'auth',
         isLoggingIn: true,
-        isMuted: false, // Default to unmuted now
+        isMuted: false,
         isVideoOff: false,
         isSharingScreen: false,
         isWhiteboardOpen: false,
@@ -27,17 +27,21 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- UI/Avatar Helpers ---
-    function getAvatarURL(seed) {
-        // Assign a style based on the seed string to keep it consistent for that user
-        const styles = ['avataaars', 'bottts', 'adventurer', 'lorelei', 'personas'];
-        let hash = 0;
-        for (let i = 0; i < seed.length; i++) {
-            hash = seed.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        const styleIndex = Math.abs(hash) % styles.length;
-        const style = styles[styleIndex];
+    function getAvatarURL(seed, style = null) {
+        // Use provided style or pick one based on seed
+        const styles = ['avataaars', 'bottts', 'adventurer', 'lorelei', 'personas', 'micah', 'croodles'];
+        let selectedStyle = style;
 
-        return `https://api.dicebear.com/7.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
+        if (!selectedStyle) {
+            let hash = 0;
+            for (let i = 0; i < seed.length; i++) {
+                hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const styleIndex = Math.abs(hash) % styles.length;
+            selectedStyle = styles[styleIndex];
+        }
+
+        return `https://api.dicebear.com/7.x/${selectedStyle}/svg?seed=${encodeURIComponent(seed)}`;
     }
 
     function getInitials(name) {
@@ -149,7 +153,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const authSubmit = document.getElementById('auth-submit');
     const nameGroup = document.getElementById('name-group');
     const authSwitchLink = document.getElementById('auth-switch-link');
-    const loginNameField = document.getElementById('full-name');
+    const loginNameField = document.getElementById('first-name');
+    const lastNameField = document.getElementById('last-name');
     const emailField = document.getElementById('email');
 
     // Dashboard
@@ -283,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 from: state.socket.id,
                 signal: offer,
                 type: 'offer',
-                userName: state.user.name
+                userName: state.user.firstName + ' ' + state.user.lastName
             });
         } else {
             await peer.setRemoteDescription(new RTCSessionDescription(remoteSignal));
@@ -432,9 +437,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         list.innerHTML = `
             <div class="participant-item">
-                <img src="${getAvatarURL(state.user.name)}" alt="Avatar">
+                <img src="${getAvatarURL(state.user.firstName, state.user.avatarStyle)}" alt="Avatar">
                 <div class="participant-info">
-                    <span class="name">${state.user.name} (You)</span>
+                    <span class="name">${state.user.firstName} ${state.user.lastName} (You)</span>
                     <span class="status">Host</span>
                 </div>
             </div>
@@ -495,11 +500,17 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const email = emailField.value;
         const password = document.getElementById('password').value;
-        const name = loginNameField.value;
+        const firstName = loginNameField.value.trim();
+        const lastName = lastNameField.value.trim();
+
+        if (!state.isLoggingIn && (!firstName || !lastName)) {
+            showToast('Please enter both first and last names', 'error');
+            return;
+        }
 
         const authSubmitBtn = document.getElementById('auth-submit');
         authSubmitBtn.disabled = true;
-        authSubmitBtn.querySelector('span').textContent = state.isLoggingIn ? 'Logging in...' : 'Signing up...';
+        authSubmitBtn.querySelector('span').textContent = state.isLoggingIn ? 'Logging in...' : 'Registering...';
 
         try {
             const { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } = window.firebaseAuth;
@@ -515,18 +526,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const user = userCredential.user;
 
                 // Update Firebase Auth Profile
-                await updateProfile(user, { displayName: name });
+                await updateProfile(user, { displayName: firstName + ' ' + lastName });
+
+                const avatarStyle = ['avataaars', 'bottts', 'adventurer', 'lorelei', 'personas'][Math.floor(Math.random() * 5)];
 
                 // Store User Data in Firestore
                 await setDoc(doc(db, "users", user.uid), {
                     uid: user.uid,
-                    displayName: name,
+                    firstName: firstName,
+                    lastName: lastName,
                     email: email,
                     createdAt: serverTimestamp(),
-                    avatarStyle: ['avataaars', 'bottts', 'adventurer', 'lorelei', 'personas'][Math.floor(Math.random() * 5)]
+                    avatarStyle: avatarStyle
                 });
 
-                showToast('Account created and details stored');
+                showToast('Account created successfully');
             }
         } catch (error) {
             console.error('Auth error:', error);
@@ -534,29 +548,58 @@ document.addEventListener('DOMContentLoaded', () => {
             errorDiv.textContent = error.message;
             errorDiv.style.display = 'block';
             authSubmitBtn.disabled = false;
-            authSubmitBtn.querySelector('span').textContent = state.isLoggingIn ? 'Log In' : 'Sign Up';
+            authSubmitBtn.querySelector('span').textContent = state.isLoggingIn ? 'Log In' : 'Complete Registration';
         }
     });
 
     // Handle Authentication State Changes
     if (window.firebaseAuth) {
         const { auth, onAuthStateChanged } = window.firebaseAuth;
-        onAuthStateChanged(auth, (user) => {
+        const { db, doc, getDoc } = window.firebaseDb;
+
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // User is signed in
-                const name = user.displayName || user.email.split('@')[0];
-                state.user = { name, email: user.email, uid: user.uid };
+                // Fetch additional user data from Firestore
+                let firstName = user.displayName ? user.displayName.split(' ')[0] : 'User';
+                let lastName = user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '';
+                let avatarStyle = 'avataaars';
+
+                try {
+                    const userDoc = await getDoc(doc(db, "users", user.uid));
+                    if (userDoc.exists()) {
+                        const data = userDoc.data();
+                        firstName = data.firstName || firstName;
+                        lastName = data.lastName || data.displayName?.split(' ').slice(1).join(' ') || '';
+                        avatarStyle = data.avatarStyle || avatarStyle;
+                    }
+                } catch (e) {
+                    console.error("Error fetching user doc:", e);
+                }
+
+                state.user = {
+                    firstName,
+                    lastName,
+                    email: user.email,
+                    uid: user.uid,
+                    avatarStyle
+                };
 
                 // Update UI for logged-in user
-                usernameDisplay.textContent = name;
+                usernameDisplay.textContent = firstName;
                 const profileAvatar = document.querySelector('.profile-trigger .avatar');
-                if (profileAvatar) profileAvatar.src = getAvatarURL(name);
+                if (profileAvatar) profileAvatar.src = getAvatarURL(firstName, avatarStyle);
 
                 const welcomeTitle = document.querySelector('.welcome-section h1');
-                if (welcomeTitle) welcomeTitle.textContent = `Good morning, ${name.split(' ')[0]}`;
+                const hour = new Date().getHours();
+                const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+                if (welcomeTitle) welcomeTitle.textContent = `${greeting}, ${firstName}`;
 
+                switchView('dashboard');
                 const localAvatar = document.getElementById('local-avatar');
-                if (localAvatar) localAvatar.src = getAvatarURL(name);
+                if (localAvatar) localAvatar.src = getAvatarURL(firstName, avatarStyle);
+
+                const localNameDisplay = document.getElementById('local-name-display');
+                if (localNameDisplay) localNameDisplay.textContent = firstName;
 
                 switchView('dashboard');
                 if (!state.socket) initSocket();
@@ -611,7 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.socket.emit('join-room', {
                 roomId: state.roomId,
                 userId: state.socket.id,
-                userName: state.user.name
+                userName: state.user.firstName + ' ' + state.user.lastName
             });
             updateControlUI();
         }
@@ -698,7 +741,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.socket.emit('send-message', {
                 roomId: state.roomId,
                 message: msg,
-                userName: state.user.name
+                userName: state.user.firstName
             });
             chatInput.value = '';
         }
@@ -805,6 +848,107 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Modal Control
+    const profileModal = document.getElementById('profile-modal');
+    const openProfileBtn = document.getElementById('open-profile-btn');
+    const closeProfileBtn = document.getElementById('close-profile-modal');
+    const cancelProfileBtn = document.getElementById('cancel-profile-edit');
+    const saveProfileBtn = document.getElementById('save-profile-btn');
+    let tempAvatarStyle = '';
+
+    if (openProfileBtn) {
+        openProfileBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!state.user) return;
+
+            tempAvatarStyle = state.user.avatarStyle;
+            document.getElementById('edit-first-name').value = state.user.firstName;
+            document.getElementById('edit-last-name').value = state.user.lastName;
+            document.getElementById('edit-email').value = state.user.email;
+            document.getElementById('modal-profile-avatar').src = getAvatarURL(state.user.firstName, tempAvatarStyle);
+
+            profileModal.classList.remove('hidden');
+        });
+    }
+
+    const closeProfileModal = () => profileModal.classList.add('hidden');
+    if (closeProfileBtn) closeProfileBtn.addEventListener('click', closeProfileModal);
+    if (cancelProfileBtn) cancelProfileBtn.addEventListener('click', closeProfileModal);
+
+    // Change Avatar Style
+    const changeAvatarBtn = document.getElementById('change-avatar-btn');
+    if (changeAvatarBtn) {
+        changeAvatarBtn.addEventListener('click', () => {
+            const styles = ['avataaars', 'bottts', 'adventurer', 'lorelei', 'personas', 'micah', 'croodles'];
+            let currentIndex = styles.indexOf(tempAvatarStyle);
+            let nextIndex = (currentIndex + 1) % styles.length;
+            tempAvatarStyle = styles[nextIndex];
+
+            const currentFirstName = document.getElementById('edit-first-name').value.trim() || state.user.firstName;
+            document.getElementById('modal-profile-avatar').src = getAvatarURL(currentFirstName, tempAvatarStyle);
+        });
+    }
+
+    // Save Profile
+    if (saveProfileBtn) {
+        saveProfileBtn.addEventListener('click', async () => {
+            const newFirstName = document.getElementById('edit-first-name').value.trim();
+            const newLastName = document.getElementById('edit-last-name').value.trim();
+
+            if (!newFirstName || !newLastName) {
+                showToast('Names cannot be empty', 'error');
+                return;
+            }
+
+            saveProfileBtn.disabled = true;
+            saveProfileBtn.querySelector('span').textContent = 'Saving...';
+
+            try {
+                const { db, doc, updateDoc } = window.firebaseDb;
+                const { auth, updateProfile } = window.firebaseAuth;
+
+                // Update Auth Profile
+                await updateProfile(auth.currentUser, {
+                    displayName: newFirstName + ' ' + newLastName
+                });
+
+                // Update Firestore
+                await updateDoc(doc(db, "users", state.user.uid), {
+                    firstName: newFirstName,
+                    lastName: newLastName,
+                    avatarStyle: tempAvatarStyle
+                });
+
+                // Update local state
+                state.user.firstName = newFirstName;
+                state.user.lastName = newLastName;
+                state.user.avatarStyle = tempAvatarStyle;
+
+                // Update UI
+                usernameDisplay.textContent = newFirstName;
+                const profileAvatar = document.querySelector('.profile-trigger .avatar');
+                if (profileAvatar) profileAvatar.src = getAvatarURL(newFirstName, state.user.avatarStyle);
+
+                const welcomeTitle = document.querySelector('.welcome-section h1');
+                const hour = new Date().getHours();
+                const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+                if (welcomeTitle) welcomeTitle.textContent = `${greeting}, ${newFirstName}`;
+
+                const localNameDisplay = document.getElementById('local-name-display');
+                if (localNameDisplay) localNameDisplay.textContent = newFirstName;
+
+                showToast('Profile updated successfully');
+                closeProfileModal();
+            } catch (error) {
+                console.error('Error saving profile:', error);
+                showToast('Failed to update profile', 'error');
+            } finally {
+                saveProfileBtn.disabled = false;
+                saveProfileBtn.querySelector('span').textContent = 'Save Changes';
+            }
+        });
+    }
+
     // Whiteboard Logic
     const canvas = document.getElementById('whiteboard-canvas');
     if (canvas) {
@@ -894,11 +1038,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Handle view switching for login/signup
-    authSwitchLink.addEventListener('click', (e) => {
+    function handleAuthSwitch(e) {
         e.preventDefault();
         state.isLoggingIn = !state.isLoggingIn;
         nameGroup.style.display = state.isLoggingIn ? 'none' : 'block';
-        authSubmit.querySelector('span').textContent = state.isLoggingIn ? 'Log In' : 'Sign Up';
+        authSubmit.querySelector('span').textContent = state.isLoggingIn ? 'Log In' : 'Complete Registration';
         document.getElementById('auth-title').textContent = state.isLoggingIn ? 'Welcome Back' : 'Create Account';
-    });
+        document.getElementById('auth-subtitle').textContent = state.isLoggingIn ? 'Log in to your account to continue' : 'Please fill in your details to get started';
+        document.getElementById('auth-error').style.display = 'none';
+        document.getElementById('auth-error').textContent = '';
+
+        const switchText = document.getElementById('auth-switch-text');
+        if (state.isLoggingIn) {
+            switchText.innerHTML = `Don't have an account? <a href="#" id="auth-switch-link">Sign Up</a>`;
+        } else {
+            switchText.innerHTML = `Already have an account? <a href="#" id="auth-switch-link">Log In</a>`;
+        }
+
+        // Re-bind the event listener as innerHTML replaces the element
+        document.getElementById('auth-switch-link').addEventListener('click', handleAuthSwitch);
+    }
+
+    authSwitchLink.addEventListener('click', handleAuthSwitch);
 });

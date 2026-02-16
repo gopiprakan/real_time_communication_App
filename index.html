@@ -32,10 +32,21 @@
 
                     <form id="auth-form">
                         <div class="form-group" id="name-group" style="display: none;">
-                            <label for="full-name">Full Name</label>
-                            <div class="input-wrapper">
-                                <i data-lucide="user"></i>
-                                <input type="text" id="full-name" placeholder="John Doe">
+                            <div class="name-inputs">
+                                <div class="form-subgroup">
+                                    <label for="first-name">First Name</label>
+                                    <div class="input-wrapper">
+                                        <i data-lucide="user"></i>
+                                        <input type="text" id="first-name" placeholder="John" autocomplete="given-name">
+                                    </div>
+                                </div>
+                                <div class="form-subgroup">
+                                    <label for="last-name">Last Name</label>
+                                    <div class="input-wrapper">
+                                        <i data-lucide="user"></i>
+                                        <input type="text" id="last-name" placeholder="Doe" autocomplete="family-name">
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -43,7 +54,8 @@
                             <label for="email">Email Address</label>
                             <div class="input-wrapper">
                                 <i data-lucide="mail"></i>
-                                <input type="email" id="email" placeholder="name@company.com" required>
+                                <input type="email" id="email" placeholder="name@company.com" required
+                                    autocomplete="email">
                             </div>
                         </div>
 
@@ -51,7 +63,8 @@
                             <label for="password">Password</label>
                             <div class="input-wrapper">
                                 <i data-lucide="lock"></i>
-                                <input type="password" id="password" placeholder="••••••••" required>
+                                <input type="password" id="password" placeholder="••••••••" required
+                                    autocomplete="new-password">
                                 <button type="button" class="password-toggle" id="toggle-password">
                                     <i data-lucide="eye"></i>
                                 </button>
@@ -84,12 +97,14 @@
                 <div class="header-actions">
                     <div class="profile-menu">
                         <button class="profile-trigger" id="profile-trigger">
-                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=John" alt="Profile"
-                                class="avatar">
-                            <span class="username">John Doe</span>
+                            <img src="" alt="Profile" class="avatar">
+                            <span class="username">User</span>
                             <i data-lucide="chevron-down"></i>
                         </button>
                         <div class="dropdown-menu" id="profile-dropdown">
+                            <button class="dropdown-item" id="open-profile-btn">
+                                <i data-lucide="user"></i> Profile Details
+                            </button>
                             <a href="#" class="dropdown-item">
                                 <i data-lucide="settings"></i> Settings
                             </a>
@@ -104,7 +119,7 @@
 
             <main class="dashboard-content">
                 <div class="welcome-section">
-                    <h1>Good morning, John</h1>
+                    <h1>Welcome</h1>
                     <p>Start a new meeting or join one in progress.</p>
                 </div>
 
@@ -174,8 +189,7 @@
                         <div class="video-container local" id="local-video-container">
                             <video id="local-video" autoplay playsinline muted></video>
                             <div class="video-placeholder" id="local-placeholder">
-                                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=John" alt="Me"
-                                    id="local-avatar">
+                                <img src="" alt="Me" id="local-avatar">
                                 <p>You</p>
                             </div>
                             <div class="video-actions">
@@ -303,6 +317,50 @@
         </section>
     </div>
 
+    <!-- Profile Modal -->
+    <div id="profile-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Profile Details</h2>
+                <button class="close-btn" id="close-profile-modal">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="profile-edit-preview">
+                    <div class="avatar-edit-wrapper">
+                        <img src="" alt="Profile Avatar" id="modal-profile-avatar" class="avatar-large">
+                        <button class="btn-icon-float" id="change-avatar-btn" title="Change Avatar Style">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="profile-details-form">
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input type="text" id="edit-first-name" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input type="text" id="edit-last-name" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" id="edit-email" class="form-control" disabled>
+                        <span class="help-text">Email cannot be changed</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="cancel-profile-edit">Cancel</button>
+                <button class="btn btn-primary" id="save-profile-btn">
+                    <span>Save Changes</span>
+                    <i data-lucide="check"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Feedback Toasts -->
     <div id="toast-container"></div>
 
@@ -316,12 +374,13 @@
         // Use a generic config - the user should replace this with their own later
         // but this will allow the app to load without immediate "undefined" errors
         const firebaseConfig = {
-            apiKey: "AIzaSyAs-DEMO-ONLY",
-            authDomain: "connect-demo.firebaseapp.com",
-            projectId: "connect-demo",
-            storageBucket: "connect-demo.appspot.com",
-            messagingSenderId: "123456789",
-            appId: "1:123456789:web:abcdef123456"
+            apiKey: "AIzaSyA-BnlYxIm8BUrHwE7xPzeF4PxlPMlHHEU",
+            authDomain: "communication-app-83102.firebaseapp.com",
+            projectId: "communication-app-83102",
+            storageBucket: "communication-app-83102.firebasestorage.app",
+            messagingSenderId: "151705842582",
+            appId: "1:151705842582:web:4a2409da190f392c0363b7",
+            measurementId: "G-DWHQ7Y3J9H"
         };
 
         // Initialize Firebase
@@ -340,7 +399,9 @@
         window.firebaseDb = {
             db: firebase.firestore(),
             doc: (db, collection, id) => db.collection(collection).doc(id),
+            getDoc: (docRef) => docRef.get(),
             setDoc: (docRef, data) => docRef.set(data),
+            updateDoc: (docRef, data) => docRef.update(data),
             serverTimestamp: () => firebase.firestore.FieldValue.serverTimestamp()
         };
     </script>
